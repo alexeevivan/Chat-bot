@@ -1,6 +1,7 @@
 import logging
 from aiogram import Bot, Dispatcher, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
+from aiogram.contrib.middlewares.logging import LoggingMiddleware
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Command
 from aiogram.types import ParseMode
@@ -14,6 +15,10 @@ logging.basicConfig(level=logging.INFO)
 bot = Bot(token=config.TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
+
+WEBAPP_HOST = '144.126.245.136'  # IP-адрес для прослушивания входящих запросов
+WEBAPP_PORT = 80  # Порт для прослушивания входящих запросов
+WEBHOOK_URL_PATH = '/webhook'  # Путь, на котором будет доступен бот
 
 # Загрузка ответов из текстового файла
 with open("responses.txt", "r", encoding="utf-8") as file:
@@ -46,4 +51,11 @@ async def echo(message: types.Message):
         await bot.send_message(chat_id=message.chat.id, text="Извините, не могу найти ответ на ваш запрос.")
 
 if __name__ == "__main__":
-    executor.start_polling(dp, skip_updates=True)
+    # Здесь вы можете добавить код для настройки вебхука
+    executor.start_webhook(
+        dispatcher=dp,
+        webhook_path=WEBHOOK_URL_PATH,
+        skip_updates=True,
+        host=WEBAPP_HOST,
+        port=WEBAPP_PORT
+    )
