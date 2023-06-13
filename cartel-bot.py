@@ -16,9 +16,9 @@ bot = Bot(token=config.TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 
-WEBAPP_HOST = '144.126.245.136'  # IP-адрес для прослушивания входящих запросов
-WEBAPP_PORT = 80  # Порт для прослушивания входящих запросов
-WEBHOOK_URL_PATH = '/webhook'  # Путь, на котором будет доступен бот
+WEBAPP_HOST = "68.183.214.201"  # IP-адрес для прослушивания входящих запросов
+WEBAPP_PORT = 8080  # Порт для прослушивания входящих запросов
+WEBHOOK_URL_PATH = "/webhook"  # Путь, на котором будет доступен бот
 
 # Загрузка ответов из текстового файла
 with open("responses.txt", "r", encoding="utf-8") as file:
@@ -33,7 +33,7 @@ with open("responses.txt", "r", encoding="utf-8") as file:
 @dp.message_handler(Command("start"))
 async def cmd_start(message: types.Message):
     # Отправляет приветственное сообщение и инструкцию по использованию бота.
-    await message.reply("Привет\U0001F44B!\nЯ твой личный помощник в мире напитков.\nОтправь название коктейля, и я расскажу всё о рецептуре его приготовления, истории создания и вариантах его подачи!")
+    await message.reply("Привет\U0001F44B!\nЯ твой личный помощник в мире напитков.\nОтправь название коктейля, и я расскажу всё о рецептуре его приготовлени>
 
 # Обработчик текстовых сообщений
 @dp.message_handler()
@@ -50,12 +50,20 @@ async def echo(message: types.Message):
         # Если нет, отправляем сообщение о том, что ответ не найден
         await bot.send_message(chat_id=message.chat.id, text="Извините, не могу найти ответ на ваш запрос.")
 
+def check_connection(dp):
+    try:
+        # Проверка соединения с Telegram API
+        bot.get_me()
+        logging.info("Соединение с Telegram API успешно установлено")
+    except Exception as e:
+        logging.exception("Ошибка при проверке соединения с Telegram API: %s", e)
+
 if __name__ == "__main__":
-    # Здесь вы можете добавить код для настройки вебхука
-    executor.start_webhook(
-        dispatcher=dp,
-        webhook_path=WEBHOOK_URL_PATH,
-        skip_updates=True,
-        host=WEBAPP_HOST,
-        port=WEBAPP_PORT
-    )
+    # Добавляем LoggingMiddleware для вывода отладочных сообщений
+    dp.middleware.setup(LoggingMiddleware())
+
+    # Запускаем проверку соединения с Telegram API перед запуском бота
+    check_connection(dp)
+
+    # Запускаем бот в режиме long polling
+    executor.start_polling(dp)
