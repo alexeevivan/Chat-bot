@@ -33,7 +33,7 @@ with open("responses.txt", "r", encoding="utf-8") as file:
 @dp.message_handler(Command("start"))
 async def cmd_start(message: types.Message):
     # Отправляет приветственное сообщение и инструкцию по использованию бота.
-    await message.reply("Привет\U0001F44B!\nЯ твой личный помощник в мире напитков.\nОтправь название коктейля, и я расскажу всё о рецептуре его приготовлени>
+    await message.reply("Привет\U0001F44B!\nЯ твой личный помощник в мире напитков.\nОтправь название коктейля, и я расскажу всё о рецептуре его приготовления>")
 
 # Обработчик текстовых сообщений
 @dp.message_handler()
@@ -48,7 +48,7 @@ async def echo(message: types.Message):
         await bot.send_message(chat_id=message.chat.id, text=response, parse_mode=ParseMode.HTML)
     else:
         # Если нет, отправляем сообщение о том, что ответ не найден
-        await bot.send_message(chat_id=message.chat.id, text="Извините, не могу найти ответ на ваш запрос.")
+        await bot.send_message(chat_id=message.chat.id, text="Извините, я не могу найти ответ на Ваш запрос.\nПопробуйте в нём что-нибудь поменять.")
 
 def check_connection(dp):
     try:
