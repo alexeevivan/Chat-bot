@@ -1,106 +1,156 @@
 import logging
+import os
+import sqlite3
+import html2text
+from collections import defaultdict
 from aiogram import Bot, Dispatcher, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.contrib.middlewares.logging import LoggingMiddleware
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Command
-from aiogram.types import ParseMode
+from aiogram.types import InputFile, ParseMode
 from aiogram.utils import executor
 
-import config  # Импортируем файл с настройками (токен бота)
+import config  # Import the file with bot settings (TOKEN)
 
 logging.basicConfig(level=logging.INFO)
 
-# Инициализация бота и хранилища состояний
+# Initialize the bot and state storage
 bot = Bot(token=config.TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 
-WEBAPP_HOST = "68.183.214.201"  # IP-адрес для прослушивания входящих запросов
-WEBAPP_PORT = 8080  # Порт для прослушивания входящих запросов
-WEBHOOK_URL_PATH = "/webhook"  # Путь, на котором будет доступен бот
+# Connect to the database and create the table
+def create_table():
+    with sqlite3.connect("bot.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS responses (
+                keyword TEXT PRIMARY KEY,
+                response TEXT NOT NULL,
+                image_path TEXT NOT NULL,
+                recipe TEXT NOT NULL,
+                method TEXT NOT NULL,
+                glassware TEXT NOT NULL,
+                garnish TEXT NOT NULL,
+                note TEXT NOT NULL,
+                history TEXT NOT NULL
+            )
+        """)
 
-# Загрузка ответов из текстового файла
-with open("responses.txt", "r", encoding="utf-8") as file:
-    responses = {}
-    for line in file:
-        line = line.strip().split(":")
-        keyword = line[0].strip().lower()
-        response = line[1].strip()
-        responses[keyword] = response.replace("(colon)", ":").replace(". ", "\n").replace("(long line)", "━━━━━━━━━━━━━━━━━━━━\n")
+# Insert data from the file into the database
+def insert_data_to_db():
+    with sqlite3.connect("bot.db") as conn:
+        cursor = conn.cursor()
 
-# Словарь для сбора статистики
-statistics = {}
+        with open("responses.txt", "r", encoding="utf-8") as file:
+            for line in file:
+                line = line.strip().split(":")
+                keyword = line[0].strip().lower()
+                response = line[1].strip()
+                image_path = line[2].strip()
+                recipe = line[3].strip().replace("---", "\n")
+                method = line[4].strip()
+                glassware = line[5].strip()
+                garnish = line[6].strip()
+                note = line[7].strip()
+                history = line[8].strip().replace("---", "\n")
 
+                cursor.execute(
+                    "INSERT OR REPLACE INTO responses (keyword, response, image_path, recipe, method, glassware, garnish, note, history) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (keyword, response, image_path, recipe, method, glassware, garnish, note, history)
+                )
 
-# Команда /start
+# Create the table and insert data if it's the first run
+create_table()
+insert_data_to_db()
+
+# Dictionary to collect statistics
+statistics = defaultdict(int)
+
+# Command /start
 @dp.message_handler(Command("start"))
 async def cmd_start(message: types.Message):
-    # Отправляет приветственное сообщение и инструкцию по использованию бота.
     await message.reply("Привет\U0001F44B!\nЯ твой личный помощник в мире напитков.\nОтправь название коктейля, и я расскажу всё о рецептуре его приготовления>")
 
-
-# Обработчик команды /статистика
+# Command /статистика_бота_для_меня
 @dp.message_handler(Command("статистика_бота_для_меня"))
 async def cmd_statistics(message: types.Message):
-    # Получаем информацию о количестве запросов от каждого пользователя
     stat_text = "Статистика использования чат-бота:\n"
     for user_id, count in statistics.items():
         user = await bot.get_chat(user_id)
         username = user.username or user.first_name or user_id
         stat_text += f"Пользователь {username}: {count} запросов\n"
 
-    # Получаем общее количество пользователей
     user_count = len(statistics)
     stat_text += f"\nВсего пользователей: {user_count}"
 
-    # Получаем самый частый запрос
     if statistics:
         most_common_request = max(statistics, key=statistics.get)
         stat_text += f"\nСамый частый запрос: {most_common_request}"
 
-    # Отправляем статистику пользователю
     await message.reply(stat_text)
 
-
-# Обработчик текстовых сообщений
+# Text messages handler
 @dp.message_handler()
 async def echo(message: types.Message):
-    # Отправляет ответ на запрос пользователя из заранее подготовленных ответов.
     user_text = message.text.lower()
 
-    # Обновляем статистику для текущего пользователя
     user_id = message.from_user.id
-    if user_id in statistics:
-        statistics[user_id] += 1
-    else:
-        statistics[user_id] = 1
+    statistics[user_id] += 1
 
-    # Проверяем, есть ли пользовательский текст в списке подготовленных ответов
-    if user_text in responses:
-        # Если есть, отправляем соответствующий ответ
-        response = responses[user_text]
-        await bot.send_message(chat_id=message.chat.id, text=response, parse_mode=ParseMode.HTML)
-    else:
-        # Если нет, отправляем сообщение о том, что ответ не найден
-        await bot.send_message(chat_id=message.chat.id, text="Извините, я не могу найти ответ на Ваш запрос.\nПопробуйте в нём что-нибудь поменять.")
+    with sqlite3.connect("bot.db") as conn:
+        cursor = conn.cursor()
 
+        cursor.execute("SELECT response, image_path, recipe, method, glassware, garnish, note, history FROM responses WHERE keyword = ?", (user_text,))
+        data = cursor.fetchone()
 
+        if data:
+            response, image_path, recipe, method, glassware, garnish, note, history = data
+
+            # Convert HTML in history to plain text
+            history_text = html2text.html2text(history)
+
+            full_response = f"""
+{response}
+
+{recipe}
+
+{method}
+
+{glassware}
+
+{garnish}
+
+{note}
+
+━━━━━━━━━━━━━━━━━━━━
+{history_text}
+
+({os.path.basename(image_path)})
+"""
+
+            with open(image_path, "rb") as photo:
+                await bot.send_photo(
+                    chat_id=message.chat.id,
+                    photo=InputFile(photo),
+                    caption=full_response,
+                    parse_mode=ParseMode.HTML
+                )
+        else:
+            await bot.send_message(
+                chat_id=message.chat.id,
+                text="Извините, я не могу найти ответ на Ваш запрос.\nПопробуйте в нём что-нибудь поменять."
+            )
+
+# Запускаем проверку соединения с Telegram API перед запуском бота
 def check_connection(dp):
     try:
-        # Проверка соединения с Telegram API
         bot.get_me()
         logging.info("Соединение с Telegram API успешно установлено")
     except Exception as e:
         logging.exception("Ошибка при проверке соединения с Telegram API: %s", e)
 
-
 if __name__ == "__main__":
-    # Добавляем LoggingMiddleware для вывода отладочных сообщений
     dp.middleware.setup(LoggingMiddleware())
-
-    # Запускаем проверку соединения с Telegram API перед запуском бота
-    check_connection(dp)
-
-    # Запускаем бот в режиме long polling
     executor.start_polling(dp)
