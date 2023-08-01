@@ -34,6 +34,7 @@ def create_table():
                 glassware TEXT NOT NULL,
                 garnish TEXT NOT NULL,
                 note TEXT NOT NULL,
+                country TEXT NOT NULL,
                 history TEXT NOT NULL
             )
         """)
@@ -49,16 +50,17 @@ def insert_data_to_db():
                 keyword = line[0].strip().lower()
                 response = line[1].strip()
                 image_path = line[2].strip()
-                recipe = line[3].strip().replace("---", "\n")
-                method = line[4].strip()
-                glassware = line[5].strip()
-                garnish = line[6].strip()
-                note = line[7].strip()
-                history = line[8].strip().replace("---", "\n")
+                recipe = line[3].strip().replace("---", "\n- ")
+                method = line[4].strip().replace("---", "\n-")
+                glassware = line[5].strip().replace("---", "\n-")
+                garnish = line[6].strip().replace("---", "\n-")
+                note = line[7].strip().replace("---", "\n- ").replace("(colon)", ":")
+                country = line[8].strip()
+                history = line[9].strip().replace("---", "\n")
 
                 cursor.execute(
-                    "INSERT OR REPLACE INTO responses (keyword, response, image_path, recipe, method, glassware, garnish, note, history) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    (keyword, response, image_path, recipe, method, glassware, garnish, note, history)
+                    "INSERT OR REPLACE INTO responses (keyword, response, image_path, recipe, method, glassware, garnish, note, country, history) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (keyword, response, image_path, recipe, method, glassware, garnish, note, country, history)
                 )
 
 # Create the table and insert data if it's the first run
@@ -102,14 +104,11 @@ async def echo(message: types.Message):
     with sqlite3.connect("bot.db") as conn:
         cursor = conn.cursor()
 
-        cursor.execute("SELECT response, image_path, recipe, method, glassware, garnish, note, history FROM responses WHERE keyword = ?", (user_text,))
+        cursor.execute("SELECT response, image_path, recipe, method, glassware, garnish, note, country, history FROM responses WHERE keyword = ?", (user_text,))
         data = cursor.fetchone()
 
         if data:
-            response, image_path, recipe, method, glassware, garnish, note, history = data
-
-            # Convert HTML in history to plain text
-            history_text = html2text.html2text(history)
+            response, image_path, recipe, method, glassware, garnish, note, country, history = data
 
             full_response = f"""
 {response}
@@ -125,18 +124,25 @@ async def echo(message: types.Message):
 {note}
 
 ━━━━━━━━━━━━━━━━━━━━
-{history_text}
+{country}
 
-({os.path.basename(image_path)})
+{history}
 """
 
             with open(image_path, "rb") as photo:
+                # Отправляем только фотографию без подписи
                 await bot.send_photo(
                     chat_id=message.chat.id,
                     photo=InputFile(photo),
-                    caption=full_response,
-                    parse_mode=ParseMode.HTML
+                    caption=None  # Устанавливаем подпись как None, чтобы не было подписи у фотографии
                 )
+
+            # Отправляем текст как отдельное сообщение без подписи
+            await bot.send_message(
+                chat_id=message.chat.id,
+                text=full_response,
+                parse_mode=ParseMode.HTML
+            )
         else:
             await bot.send_message(
                 chat_id=message.chat.id,
