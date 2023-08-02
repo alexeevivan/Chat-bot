@@ -50,13 +50,13 @@ def insert_data_to_db():
                 keyword = line[0].strip().lower()
                 response = line[1].strip()
                 image_path = line[2].strip()
-                recipe = line[3].strip().replace("---", "\n- ")
+                recipe = line[3].strip().replace("---", "\n- ").replace("(break)", "\n")
                 method = line[4].strip().replace("---", "\n-")
                 glassware = line[5].strip().replace("---", "\n-")
-                garnish = line[6].strip().replace("---", "\n-")
+                garnish = line[6].strip().replace("---", "\n-").replace("(colon)", ":")
                 note = line[7].strip().replace("---", "\n- ").replace("(colon)", ":")
                 country = line[8].strip()
-                history = line[9].strip().replace("---", "\n")
+                history = line[9].strip().replace("---", "\n").replace("(colon)", ":")
 
                 cursor.execute(
                     "INSERT OR REPLACE INTO responses (keyword, response, image_path, recipe, method, glassware, garnish, note, country, history) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
