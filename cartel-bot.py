@@ -51,7 +51,7 @@ def insert_data_to_db():
                 response = line[1].strip()
                 image_path = line[2].strip()
                 recipe = line[3].strip().replace("---", "\n- ").replace("(break)", "\n")
-                method = line[4].strip().replace("---", "\n-")
+                method = line[4].strip().replace("---", "\n-").replace("(colon)", ":")
                 glassware = line[5].strip().replace("---", "\n-")
                 garnish = line[6].strip().replace("---", "\n-").replace("(colon)", ":")
                 note = line[7].strip().replace("---", "\n- ").replace("(colon)", ":")
