@@ -54,7 +54,7 @@ def insert_data_to_db():
                 method = line[4].strip().replace("---", "\n-").replace("(colon)", ":")
                 glassware = line[5].strip().replace("---", "\n-")
                 garnish = line[6].strip().replace("---", "\n-").replace("(colon)", ":")
-                note = line[7].strip().replace("---", "\n- ").replace("(colon)", ":")
+                note = line[7].strip().replace("---", "\n- ").replace("(colon)", ":").replace("(break)", "\n")
                 country = line[8].strip()
                 history = line[9].strip().replace("---", "\n").replace("(colon)", ":")
 
