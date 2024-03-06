@@ -1,6 +1,7 @@
 import logging
 import os
 import sqlite3
+import random
 from collections import defaultdict
 from aiogram import Bot, Dispatcher, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
@@ -84,27 +85,33 @@ def insert_data_to_db():
 
 # Insert data from the file into the database
 def insert_data_to_eng_db():
-    with sqlite3.connect("bot_eng.db") as conn:
-        cursor = conn.cursor()
+	with sqlite3.connect("bot_eng.db") as conn:
+		cursor = conn.cursor()
 
-        with open("responses_eng.txt", "r", encoding="utf-8") as file:
-            for line in file:
-                line = line.strip().split(":")
-                keyword = line[0].strip().lower()
-                response = line[1].strip().replace("(break)", "\n")
-                image_path = line[2].strip()
-                recipe = line[3].strip().replace("---", "\n- ").replace("(colon)", ":").replace("(break)", "\n")
-                method = line[4].strip().replace("---", "\n-").replace("(colon)", ":").replace("(break)", "\n")
-                glassware = line[5].strip().replace("---", "\n-")
-                garnish = line[6].strip().replace("---", "\n-").replace("(colon)", ":")
-                note = line[7].strip().replace("---", "\n- ").replace("(colon)", ":").replace("(break)", "\n")
-                country = line[8].strip()
-                history = line[9].strip().replace("---", "\n").replace("(colon)", ":").replace("(break)", "\n")
+	with open("responses_eng.txt", "r", encoding="utf-8") as file:
+		for line in file:
+			line = line.strip()
+			if not line:
+				continue  # Пропускаем пустые строки
+			line = line.split(":")
+			if len(line) >= 10:  # Проверяем, что список содержит не менее 10 элементов
+				keyword = line[0].strip().lower()
+				response = line[1].strip().replace("(break)", "\n")
+				image_path = line[2].strip()
+				recipe = line[3].strip().replace("---", "\n- ").replace("(colon)", ":").replace("(break)", "\n")
+				method = line[4].strip().replace("---", "\n-").replace("(colon)", ":").replace("(break)", "\n")
+				glassware = line[5].strip().replace("---", "\n-")
+				garnish = line[6].strip().replace("---", "\n-").replace("(colon)", ":")
+				note = line[7].strip().replace("---", "\n- ").replace("(colon)", ":").replace("(break)", "\n")
+				country = line[8].strip()
+				history = line[9].strip().replace("---", "\n").replace("(colon)", ":").replace("(break)", "\n")
+			else:
+				print("Invalid line format:", line)
 
-                cursor.execute(
-                    "INSERT OR REPLACE INTO responses (keyword, response, image_path, recipe, method, glassware, garnish, note, country, history) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    (keyword, response, image_path, recipe, method, glassware, garnish, note, country, history)
-                )
+				cursor.execute(
+					"INSERT OR REPLACE INTO responses (keyword, response, image_path, recipe, method, glassware, garnish, note, country, history) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+					(keyword, response, image_path, recipe, method, glassware, garnish, note, country, history)
+				)
 
 # Create the table and insert data if it's the first run
 create_table()
@@ -258,6 +265,24 @@ async def cmd_statistics(message: types.Message):
 		stat_text += f"\nСамый частый запрос: {most_common_request}"
 
 	await message.reply(stat_text)
+
+
+# Interesting facts
+def get_random_fact(language_code):
+    filename = f"facts_{language_code}.txt"
+    with open(filename, "r", encoding="utf-8") as file:
+        lines = file.readlines()
+        random_fact = random.choice(lines).strip()
+        random_fact = random_fact.replace("(break)", "\n").replace("(colon)", ":")
+        return random_fact
+
+@dp.message_handler(Command("interesting_facts"), state="*")
+async def cmd_interesting_facts(message: types.Message, state: FSMContext):
+    user_language_code = user_language.get(message.from_user.id, "en")  # Получаем язык пользователя
+
+    # Получаем случайный факт в соответствии с выбранным языком
+    random_fact = get_random_fact(user_language_code)
+    await message.answer(random_fact,parse_mode=ParseMode.HTML)
 
 # Text messages handler
 @dp.message_handler()
